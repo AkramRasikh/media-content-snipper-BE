@@ -35,6 +35,41 @@ if (!fs.existsSync(videoPath)) {
   fs.mkdirSync(videoPath, { recursive: true });
 }
 
+app.post('/audio-snippet', (req, res) => {
+  const { contentName, trimStart, trimEnd } = req.body;
+
+  // Check if all necessary parameters are provided
+  if (!contentName || !trimStart || !trimEnd) {
+    return res.status(400).json({ error: 'Missing required parameters' });
+  }
+
+  const outputFileName = `${contentName}-${trimStart}`;
+  // Construct the FFmpeg command dynamically
+  const outputFilePath = path.join(audioPath, `${outputFileName}.mp3`);
+  const inputFilePath = path.join(audioPath, `${contentName}.mp3`);
+
+  const ffmpegCommand = `ffmpeg -i ${inputFilePath} -ss ${trimStart} -to ${trimEnd} -c copy ${outputFilePath}`;
+  // const ffmpegCommand = `ffmpeg -i ${contentName}.webm -ss ${trimStart} -to ${trimEnd} -vn -ar 44100 -ab 96k -ac 2 ${outputFilePath}`;
+
+  // Execute the FFmpeg command
+  exec(ffmpegCommand, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Error executing FFmpeg command: ${error.message}`);
+      return res.status(500).json({ error: error.message });
+    }
+
+    if (stderr) {
+      console.error(`FFmpeg stderr: ${stderr}`);
+    }
+
+    // Send response with the URL to the saved file
+    return res.json({
+      message: 'Audio successfully extracted and trimmed',
+      file: `/audio/${outputFileName}.mp3`, // URL to access the file
+    });
+  });
+});
+
 // POST endpoint to convert video to audio
 app.post('/video-to-audio', (req, res) => {
   // Extract values from the request body
