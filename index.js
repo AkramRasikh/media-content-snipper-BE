@@ -17,7 +17,7 @@ app.use(express.urlencoded({ extended: true }));
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     // Save to the public folder in the React app
-    cb(null, path.join(__dirname, 'public', 'audio'));
+    cb(null, path.join(__dirname, 'public', 'video'));
   },
   filename: (req, file, cb) => {
     cb(null, file.originalname);
@@ -27,23 +27,29 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 const audioPath = path.join(__dirname, 'public', 'audio');
+const videoPath = path.join(__dirname, 'public', 'video');
 if (!fs.existsSync(audioPath)) {
   fs.mkdirSync(audioPath, { recursive: true });
+}
+if (!fs.existsSync(videoPath)) {
+  fs.mkdirSync(videoPath, { recursive: true });
 }
 
 // POST endpoint to convert video to audio
 app.post('/video-to-audio', (req, res) => {
   // Extract values from the request body
-  const { inputFileName, outputFileName, trimStart, trimEnd } = req.body;
+  const { contentName, trimStart, trimEnd } = req.body;
 
   // Check if all necessary parameters are provided
-  if (!inputFileName || !outputFileName || !trimStart || !trimEnd) {
+  if (!contentName || !trimStart || !trimEnd) {
     return res.status(400).json({ error: 'Missing required parameters' });
   }
 
   // Construct the FFmpeg command dynamically
-  const outputFilePath = path.join(publicFolder, `${outputFileName}.mp3`);
-  const ffmpegCommand = `ffmpeg -i ${inputFileName}.webm -ss ${trimStart} -to ${trimEnd} -vn -ar 44100 -ab 96k -ac 2 ${outputFilePath}`;
+  const outputFilePath = path.join(audioPath, `${contentName}.mp3`);
+  const inputFilePath = path.join(videoPath, `${contentName}.webm`);
+  const ffmpegCommand = `ffmpeg -i ${inputFilePath} -ss ${trimStart} -to ${trimEnd} -vn -ar 44100 -ab 96k -ac 2 ${outputFilePath}`;
+  // const ffmpegCommand = `ffmpeg -i ${contentName}.webm -ss ${trimStart} -to ${trimEnd} -vn -ar 44100 -ab 96k -ac 2 ${outputFilePath}`;
 
   // Execute the FFmpeg command
   exec(ffmpegCommand, (error, stdout, stderr) => {
@@ -59,13 +65,13 @@ app.post('/video-to-audio', (req, res) => {
     // Send response with the URL to the saved file
     return res.json({
       message: 'Audio successfully extracted and trimmed',
-      file: `/audio/${outputFileName}.mp3`, // URL to access the file
+      file: `/audio/${contentName}.mp3`, // URL to access the file
     });
   });
 });
 
 app.post('/upload-file', upload.single('file'), (req, res) => {
-  console.log('## /upload-file 1');
+  console.log('## /upload-file 1', req.file);
 
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
