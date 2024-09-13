@@ -4,6 +4,12 @@ const cors = require('cors'); // Import the cors package
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const {
+  sendContentToFirebase,
+  uploadBufferToFirebase,
+} = require('./send-to-firebase');
+const { secondsToHHMMSS } = require('./utils/seconds-to-hhmmss');
+const { isNumber } = require('./utils/isNumber');
 
 const app = express();
 const port = 4000;
@@ -35,11 +41,45 @@ if (!fs.existsSync(videoPath)) {
   fs.mkdirSync(videoPath, { recursive: true });
 }
 
+app.post('/send-to-content', async (req, res) => {
+  const { firebaseContentTitle, trimStart, trimEnd, transcript } = req.body;
+  // Check if all necessary parameters are provided
+  if (
+    !firebaseContentTitle ||
+    !isNumber(trimStart) ||
+    !isNumber(trimEnd) ||
+    !transcript
+  ) {
+    return res.status(400).json({ error: 'Missing required parameters' });
+  }
+
+  const inAudioFolderTitle = firebaseContentTitle + '-' + trimStart;
+  const formattedTitle =
+    firebaseContentTitle +
+    '-' +
+    secondsToHHMMSS(trimStart) +
+    '-' +
+    secondsToHHMMSS(trimEnd);
+
+  try {
+    await uploadBufferToFirebase({
+      inAudioTitle: inAudioFolderTitle,
+      formattedTitle,
+    });
+    await sendContentToFirebase({ transcript, formattedTitle });
+    res
+      .status(200)
+      .json({ message: 'Successfully updated entry', contentEntry });
+  } catch (error) {
+    res.status(500).json({ error });
+  }
+});
+
 app.post('/audio-snippet', (req, res) => {
   const { contentName, trimStart, trimEnd } = req.body;
 
   // Check if all necessary parameters are provided
-  if (!contentName || !trimStart || !trimEnd) {
+  if (!contentName || !isNumber(trimStart) || !isNumber(trimEnd)) {
     return res.status(400).json({ error: 'Missing required parameters' });
   }
 
